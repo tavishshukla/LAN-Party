@@ -13,12 +13,13 @@ A terminal chat app for computers on the same trusted local network. Built with 
 
 - `/help` — show commands
 - `/users` — list who's online
+- `/msg <username> <message>` — send a private message to someone online
 - `/quit` — disconnect
 
 ## Notes
 
-This first version uses unencrypted plain-text chat. Use it only on a trusted LAN and never expose port 5050 to the internet.
+Chat is currently unencrypted plain text. Use it only on a trusted LAN and never expose port 5050 to the internet. Private messages are private from other chat participants, but they are not encrypted from anyone who can monitor the network.
 
 ## What's next
 
-Rooms, private messages, terminal multiplayer games, scoreboards, and chat log export.
+Rooms, terminal multiplayer games, scoreboards, and chat log export.
