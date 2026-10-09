@@ -21,6 +21,10 @@ A terminal chat app for computers on the same trusted local network. Built with 
 
 Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room.
 
+## Tests
+
+Run the built-in tests with `python -m unittest discover -s tests -v`. GitHub Actions runs the same tests on pushes to `main` and on pull requests.
+
 ## Notes
 
 Chat is currently unencrypted plain text. Use it only on a trusted LAN and never expose port 5050 to the internet. Private messages are private from other chat participants, but they are not encrypted from anyone who can monitor the network.
