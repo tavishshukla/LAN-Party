@@ -87,11 +87,17 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /msg <username> <message> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /msg <username> <message> /me <action> /quit"})
             elif msg == "/users":
                 with lock:
                     names = sorted(clients.values(), key=str.lower)
                 send(sock, {"type": "system", "time": stamp(), "text": "online: " + ", ".join(names)})
+            elif msg == "/me" or msg.startswith("/me "):
+                action = msg[3:].strip()
+                if not action:
+                    send(sock, {"type": "error", "text": "usage: /me <action>"})
+                    continue
+                broadcast({"type": "action", "time": stamp(), "name": name, "text": action[:450]})
             elif msg.startswith("/msg "):
                 parts = msg.split(maxsplit=2)
                 if len(parts) < 3 or not parts[2].strip():
