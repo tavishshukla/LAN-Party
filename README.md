@@ -14,6 +14,7 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/help` — show commands
 - `/users` — list who's online
 - `/msg <username> <message>` — send a private message to someone online
+- `/me <action>` — show an action in chat, e.g. `/me is ready to play`
 - `/quit` — disconnect
 
 ## Notes
