@@ -14,6 +14,14 @@ def stamp():
     return datetime.now().strftime("%H:%M:%S")
 
 
+def clean_username(value):
+    return "".join(ch for ch in str(value).strip() if ch.isalnum() or ch in "_-")[:20]
+
+
+def clean_room_name(value):
+    return "".join(ch for ch in str(value) if ch.isalnum() or ch in "_-")[:24].lower()
+
+
 def send(sock, packet):
     try:
         sock.sendall((json.dumps(packet, ensure_ascii=False) + "\n").encode("utf-8"))
@@ -68,8 +76,7 @@ def handle(sock, address):
         if not isinstance(initial, dict):
             send(sock, {"type": "error", "text": "Invalid login packet."})
             return
-        name = str(initial.get("name", "")).strip()
-        name = "".join(ch for ch in name if ch.isalnum() or ch in "_-")[:20]
+        name = clean_username(initial.get("name", ""))
         if not name:
             send(sock, {"type": "error", "text": "Pick a username using letters, numbers, _ or -."})
             return
@@ -121,7 +128,7 @@ def handle(sock, address):
                 if len(parts) != 2:
                     send(sock, {"type": "error", "text": "usage: /join <room>"})
                     continue
-                new_room = "".join(ch for ch in parts[1] if ch.isalnum() or ch in "_-")[:24].lower()
+                new_room = clean_room_name(parts[1])
                 if not new_room:
                     send(sock, {"type": "error", "text": "room names can use letters, numbers, _ and -"})
                     continue
