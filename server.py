@@ -7,6 +7,8 @@ HOST, PORT = "0.0.0.0", 5050
 DEFAULT_ROOM = "lobby"
 clients = {}
 rooms = {}
+room_history = {}
+HISTORY_LIMIT = 10
 lock = threading.Lock()
 
 
@@ -28,6 +30,14 @@ def send(sock, packet):
         return True
     except OSError:
         return False
+
+
+def remember(room, packet):
+    """Keep the latest chat messages/actions in memory for each room."""
+    with lock:
+        history = room_history.setdefault(room, [])
+        history.append(packet.copy())
+        del history[:-HISTORY_LIMIT]
 
 
 def broadcast(packet, exclude=None, room=None):
@@ -106,7 +116,12 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /join <room> /msg <username> <message> /me <action> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /join <room> /msg <username> <message> /me <action> /quit"})
+            elif msg == "/history":
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    history = list(room_history.get(current_room, []))
+                send(sock, {"type": "history", "room": current_room, "items": history})
             elif msg == "/users":
                 with lock:
                     current_room = rooms.get(sock, DEFAULT_ROOM)
@@ -144,7 +159,10 @@ def handle(sock, address):
                 if not action:
                     send(sock, {"type": "error", "text": "usage: /me <action>"})
                     continue
-                broadcast({"type": "action", "time": stamp(), "name": name, "text": action[:450]}, room=rooms.get(sock, DEFAULT_ROOM))
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                action_packet = {"type": "action", "time": stamp(), "name": name, "text": action[:450]}
+                remember(current_room, action_packet)
+                broadcast(action_packet, room=current_room)
             elif msg.startswith("/msg "):
                 parts = msg.split(maxsplit=2)
                 if len(parts) < 3 or not parts[2].strip():
@@ -165,7 +183,10 @@ def handle(sock, address):
                 else:
                     send(sock, private_packet)
             else:
-                broadcast({"type": "message", "time": stamp(), "name": name, "text": msg}, room=rooms.get(sock, DEFAULT_ROOM))
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                message_packet = {"type": "message", "time": stamp(), "name": name, "text": msg}
+                remember(current_room, message_packet)
+                broadcast(message_packet, room=current_room)
     except (OSError, ValueError, AttributeError):
         pass
     finally:
