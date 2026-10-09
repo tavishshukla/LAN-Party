@@ -19,6 +19,8 @@ def receive(sock, stopped):
                 print(f"\n[{packet.get('time', '--:--:--')}] * {packet.get('text', '')}")
             elif kind == "message":
                 print(f"\n[{packet.get('time', '--:--:--')}] {packet.get('name', '?')}: {packet.get('text', '')}")
+            elif kind == "action":
+                print(f"\n[{packet.get('time', '--:--:--')}] * {packet.get('name', '?')} {packet.get('text', '')}")
             elif kind == "private":
                 sender = packet.get("from", "?")
                 recipient = packet.get("to", "?")
