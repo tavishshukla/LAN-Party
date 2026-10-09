@@ -39,6 +39,14 @@ def remove_client(sock):
         broadcast({"type": "system", "time": stamp(), "text": f"{name} left the chat"})
 
 
+def find_client(username):
+    with lock:
+        for client_sock, client_name in clients.items():
+            if client_name.lower() == username.lower():
+                return client_sock, client_name
+    return None, None
+
+
 def handle(sock, address):
     name = None
     reader = None
@@ -70,7 +78,7 @@ def handle(sock, address):
                 packet = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if packet.get("type") != "message":
+            if not isinstance(packet, dict) or packet.get("type") != "message":
                 continue
 
             msg = str(packet.get("text", "")).strip()[:500]
@@ -79,11 +87,30 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /msg <username> <message> /quit"})
             elif msg == "/users":
                 with lock:
                     names = sorted(clients.values(), key=str.lower)
                 send(sock, {"type": "system", "time": stamp(), "text": "online: " + ", ".join(names)})
+            elif msg.startswith("/msg "):
+                parts = msg.split(maxsplit=2)
+                if len(parts) < 3 or not parts[2].strip():
+                    send(sock, {"type": "error", "text": "usage: /msg <username> <message>"})
+                    continue
+                target_sock, target_name = find_client(parts[1])
+                if target_sock is None:
+                    send(sock, {"type": "error", "text": f"{parts[1]} isn't online"})
+                    continue
+                if target_sock is sock:
+                    send(sock, {"type": "error", "text": "you can just say that in chat"})
+                    continue
+                timestamp = stamp()
+                packet = {"type": "private", "time": timestamp, "from": name, "to": target_name, "text": parts[2]}
+                if not send(target_sock, packet):
+                    remove_client(target_sock)
+                    send(sock, {"type": "error", "text": f"couldn't send to {target_name}; they may have disconnected"})
+                else:
+                    send(sock, packet)
             else:
                 broadcast({"type": "message", "time": stamp(), "name": name, "text": msg})
     except (OSError, ValueError, AttributeError):
