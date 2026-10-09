@@ -19,6 +19,10 @@ def receive(sock, stopped):
                 print(f"\n[{packet.get('time', '--:--:--')}] * {packet.get('text', '')}")
             elif kind == "message":
                 print(f"\n[{packet.get('time', '--:--:--')}] {packet.get('name', '?')}: {packet.get('text', '')}")
+            elif kind == "private":
+                sender = packet.get("from", "?")
+                recipient = packet.get("to", "?")
+                print(f"\n[{packet.get('time', '--:--:--')}] [DM] {sender} -> {recipient}: {packet.get('text', '')}")
             elif kind == "error":
                 print(f"\n[error] {packet.get('text', '')}")
             print("> ", end="", flush=True)
