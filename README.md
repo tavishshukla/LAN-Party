@@ -20,7 +20,7 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/me <action>` — show an action in your current room, e.g. `/me is ready to play`
 - `/quit` — disconnect
 
-Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room. Each room keeps its latest 10 messages/actions in memory for `/history`; history resets when the server restarts.
+Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room. Each room keeps its latest 10 messages/actions in a local SQLite database (`chat_history.sqlite3`), so history survives server restarts.
 
 ## Tests
 
