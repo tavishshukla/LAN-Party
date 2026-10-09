@@ -14,12 +14,13 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/help` — show commands
 - `/users` — list who's online in your current room
 - `/rooms` — list rooms and how many people are in each
+- `/history` — show the last 10 messages/actions in your current room
 - `/join <room>` — switch rooms; names can use letters, numbers, `_` and `-`
 - `/msg <username> <message>` — send a private message to someone online
 - `/me <action>` — show an action in your current room, e.g. `/me is ready to play`
 - `/quit` — disconnect
 
-Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room.
+Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room. Each room keeps its latest 10 messages/actions in memory for `/history`; history resets when the server restarts.
 
 ## Tests
 
