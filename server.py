@@ -1,5 +1,6 @@
 import json
 import socket
+import sqlite3
 import threading
 from datetime import datetime
 
@@ -7,8 +8,8 @@ HOST, PORT = "0.0.0.0", 5050
 DEFAULT_ROOM = "lobby"
 clients = {}
 rooms = {}
-room_history = {}
 HISTORY_LIMIT = 10
+HISTORY_DB = "chat_history.sqlite3"
 lock = threading.Lock()
 
 
@@ -33,11 +34,54 @@ def send(sock, packet):
 
 
 def remember(room, packet):
-    """Keep the latest chat messages/actions in memory for each room."""
-    with lock:
-        history = room_history.setdefault(room, [])
-        history.append(packet.copy())
-        del history[:-HISTORY_LIMIT]
+    """Save a room message and keep only its latest ten entries."""
+    with sqlite3.connect(HISTORY_DB, timeout=5) as db:
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                time TEXT NOT NULL,
+                name TEXT NOT NULL,
+                text TEXT NOT NULL
+            )"""
+        )
+        db.execute(
+            "INSERT INTO history (room, kind, time, name, text) VALUES (?, ?, ?, ?, ?)",
+            (room, packet["type"], packet["time"], packet["name"], packet["text"]),
+        )
+        db.execute(
+            """DELETE FROM history
+               WHERE room = ? AND id NOT IN (
+                   SELECT id FROM history WHERE room = ?
+                   ORDER BY id DESC LIMIT ?
+               )""",
+            (room, room, HISTORY_LIMIT),
+        )
+
+
+def load_history(room):
+    """Load a room's latest messages in chronological order."""
+    with sqlite3.connect(HISTORY_DB, timeout=5) as db:
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                time TEXT NOT NULL,
+                name TEXT NOT NULL,
+                text TEXT NOT NULL
+            )"""
+        )
+        rows = db.execute(
+            "SELECT kind, time, name, text FROM history WHERE room = ? ORDER BY id DESC LIMIT ?",
+            (room, HISTORY_LIMIT),
+        ).fetchall()
+    rows.reverse()
+    return [
+        {"type": kind, "time": time, "name": name, "text": text}
+        for kind, time, name, text in rows
+    ]
 
 
 def broadcast(packet, exclude=None, room=None):
@@ -119,8 +163,7 @@ def handle(sock, address):
                 send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /join <room> /msg <username> <message> /me <action> /quit"})
             elif msg == "/history":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
-                with lock:
-                    history = list(room_history.get(current_room, []))
+                history = load_history(current_room)
                 send(sock, {"type": "history", "room": current_room, "items": history})
             elif msg == "/users":
                 with lock:
