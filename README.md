@@ -12,10 +12,14 @@ A terminal chat app for computers on the same trusted local network. Built with 
 ## Commands
 
 - `/help` — show commands
-- `/users` — list who's online
+- `/users` — list who's online in your current room
+- `/rooms` — list rooms and how many people are in each
+- `/join <room>` — switch rooms; names can use letters, numbers, `_` and `-`
 - `/msg <username> <message>` — send a private message to someone online
-- `/me <action>` — show an action in chat, e.g. `/me is ready to play`
+- `/me <action>` — show an action in your current room, e.g. `/me is ready to play`
 - `/quit` — disconnect
+
+Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room.
 
 ## Notes
 
@@ -23,4 +27,4 @@ Chat is currently unencrypted plain text. Use it only on a trusted LAN and never
 
 ## What's next
 
-Rooms, terminal multiplayer games, scoreboards, and chat log export.
+Terminal multiplayer games, scoreboards, and chat log export.
