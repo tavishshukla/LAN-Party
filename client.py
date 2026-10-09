@@ -25,6 +25,19 @@ def receive(sock, stopped):
                 sender = packet.get("from", "?")
                 recipient = packet.get("to", "?")
                 print(f"\n[{packet.get('time', '--:--:--')}] [DM] {sender} -> {recipient}: {packet.get('text', '')}")
+            elif kind == "history":
+                room = packet.get("room", "?")
+                items = packet.get("items", [])
+                print(f"\n--- recent messages in #{room} ---")
+                if not items:
+                    print("(no chat history yet)")
+                for item in items:
+                    time = item.get("time", "--:--:--")
+                    if item.get("type") == "action":
+                        print(f"[{time}] * {item.get('name', '?')} {item.get('text', '')}")
+                    else:
+                        print(f"[{time}] {item.get('name', '?')}: {item.get('text', '')}")
+                print("--- end history ---")
             elif kind == "error":
                 print(f"\n[error] {packet.get('text', '')}")
             print("> ", end="", flush=True)
