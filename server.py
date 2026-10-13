@@ -1,4 +1,5 @@
 import json
+import random
 import socket
 import sqlite3
 import threading
@@ -8,6 +9,7 @@ HOST, PORT = "0.0.0.0", 5050
 DEFAULT_ROOM = "lobby"
 clients = {}
 rooms = {}
+games = {}
 HISTORY_LIMIT = 10
 HISTORY_DB = "chat_history.sqlite3"
 lock = threading.Lock()
@@ -23,6 +25,14 @@ def clean_username(value):
 
 def clean_room_name(value):
     return "".join(ch for ch in str(value) if ch.isalnum() or ch in "_-")[:24].lower()
+
+
+def compare_guess(secret, guess):
+    if guess < secret:
+        return "low"
+    if guess > secret:
+        return "high"
+    return "correct"
 
 
 def send(sock, packet):
@@ -160,11 +170,53 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /join <room> /msg <username> <message> /me <action> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /join <room> /msg <username> <message> /me <action> /quit"})
             elif msg == "/history":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 history = load_history(current_room)
                 send(sock, {"type": "history", "room": current_room, "items": history})
+            elif msg == "/game":
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    if current_room in games:
+                        game_exists = True
+                    else:
+                        games[current_room] = {"secret": random.randint(1, 100), "starter": name}
+                        game_exists = False
+                if game_exists:
+                    send(sock, {"type": "error", "text": "there's already a guessing game running in this room"})
+                else:
+                    broadcast({"type": "system", "time": stamp(), "text": f"{name} started a number guessing game in #{current_room}. Guess a number from 1 to 100 with /guess <number>!"}, room=current_room)
+            elif msg == "/guess" or msg.startswith("/guess "):
+                parts = msg.split(maxsplit=1)
+                if len(parts) != 2:
+                    send(sock, {"type": "error", "text": "usage: /guess <number from 1 to 100>"})
+                    continue
+                try:
+                    guess = int(parts[1])
+                except ValueError:
+                    send(sock, {"type": "error", "text": "guess must be a whole number from 1 to 100"})
+                    continue
+                if not 1 <= guess <= 100:
+                    send(sock, {"type": "error", "text": "guess must be between 1 and 100"})
+                    continue
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    game = games.get(current_room)
+                    if game is None:
+                        result = "missing"
+                    else:
+                        result = compare_guess(game["secret"], guess)
+                        if result == "correct":
+                            games.pop(current_room, None)
+                if result == "missing":
+                    send(sock, {"type": "error", "text": "no game is running in this room; start one with /game"})
+                elif result == "low":
+                    send(sock, {"type": "system", "time": stamp(), "text": "too low — try again"})
+                elif result == "high":
+                    send(sock, {"type": "system", "time": stamp(), "text": "too high — try again"})
+                else:
+                    broadcast({"type": "system", "time": stamp(), "text": f"{name} guessed {guess} and won the game in #{current_room}!"}, room=current_room)
             elif msg == "/users":
                 with lock:
                     current_room = rooms.get(sock, DEFAULT_ROOM)
