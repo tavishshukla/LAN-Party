@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import server
-from server import clean_room_name, clean_username
+from server import clean_room_name, clean_username, compare_guess
 
 
 class ChatInputTests(unittest.TestCase):
@@ -53,6 +53,17 @@ class ChatHistoryTests(unittest.TestCase):
 
                 # Loading from SQLite again returns the same saved history.
                 self.assertEqual(server.load_history("lobby"), history)
+
+
+class GuessingGameTests(unittest.TestCase):
+    def test_guess_too_low(self):
+        self.assertEqual(compare_guess(50, 12), "low")
+
+    def test_guess_too_high(self):
+        self.assertEqual(compare_guess(50, 88), "high")
+
+    def test_correct_guess(self):
+        self.assertEqual(compare_guess(50, 50), "correct")
 
 
 if __name__ == "__main__":
