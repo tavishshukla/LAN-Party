@@ -70,6 +70,41 @@ def remember(room, packet):
         )
 
 
+def record_win(room, username):
+    """Add one win to a player's room scoreboard."""
+    with sqlite3.connect(HISTORY_DB, timeout=5) as db:
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS scores (
+                room TEXT NOT NULL,
+                name TEXT NOT NULL,
+                wins INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (room, name)
+            )"""
+        )
+        db.execute(
+            """INSERT INTO scores (room, name, wins) VALUES (?, ?, 1)
+               ON CONFLICT(room, name) DO UPDATE SET wins = wins + 1""",
+            (room, username),
+        )
+
+
+def load_scores(room):
+    """Return room scores from most wins to least."""
+    with sqlite3.connect(HISTORY_DB, timeout=5) as db:
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS scores (
+                room TEXT NOT NULL,
+                name TEXT NOT NULL,
+                wins INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (room, name)
+            )"""
+        )
+        return db.execute(
+            "SELECT name, wins FROM scores WHERE room = ? ORDER BY wins DESC, name COLLATE NOCASE ASC",
+            (room,),
+        ).fetchall()
+
+
 def load_history(room):
     """Load a room's latest messages in chronological order."""
     with sqlite3.connect(HISTORY_DB, timeout=5) as db:
@@ -170,7 +205,7 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /join <room> /msg <username> <message> /me <action> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /scores /join <room> /msg <username> <message> /me <action> /quit"})
             elif msg == "/history":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 history = load_history(current_room)
@@ -216,7 +251,17 @@ def handle(sock, address):
                 elif result == "high":
                     send(sock, {"type": "system", "time": stamp(), "text": "too high — try again"})
                 else:
-                    broadcast({"type": "system", "time": stamp(), "text": f"{name} guessed {guess} and won the game in #{current_room}!"}, room=current_room)
+                    record_win(current_room, name)
+                    broadcast({"type": "system", "time": stamp(), "text": f"{name} guessed {guess} and won the game in #{current_room}! Use /scores to see the room leaderboard."}, room=current_room)
+            elif msg == "/scores":
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                scores = load_scores(current_room)
+                if scores:
+                    summary = ", ".join(f"{player}: {wins}" for player, wins in scores)
+                    text = f"guessing game scores in #{current_room}: {summary}"
+                else:
+                    text = f"no wins recorded in #{current_room} yet"
+                send(sock, {"type": "system", "time": stamp(), "text": text})
             elif msg == "/users":
                 with lock:
                     current_room = rooms.get(sock, DEFAULT_ROOM)
