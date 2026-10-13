@@ -306,8 +306,7 @@ def handle(sock, address):
                 elif move_result == "occupied":
                     send(sock, {"type": "error", "text": "that square is taken"})
                 elif move_result == "won":
-                    record_win(current_room, name)
-                    broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\n{name} wins tic-tac-toe! Use /scores for the number-game leaderboard."}, room=current_room)
+                    broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\n{name} wins tic-tac-toe!"}, room=current_room)
                 elif move_result == "draw":
                     broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\nIt's a draw."}, room=current_room)
                 else:
