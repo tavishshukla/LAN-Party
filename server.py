@@ -251,6 +251,15 @@ def handle(sock, address):
                 send(sock, {"type": "history", "room": current_room, "items": history})
             elif msg == "/poll" or msg.startswith("/poll "):
                 current_room = rooms.get(sock, DEFAULT_ROOM)
+                if msg == "/poll":
+                    with lock:
+                        current_poll = polls.get(current_room)
+                        summary = poll_summary(current_poll) if current_poll else None
+                    if summary is None:
+                        send(sock, {"type": "error", "text": "there's no active poll in this room"})
+                    else:
+                        send(sock, {"type": "system", "time": stamp(), "text": summary})
+                    continue
                 parts = msg[6:].split("|")
                 if len(parts) < 3 or len(parts) > 6:
                     send(sock, {"type": "error", "text": "usage: /poll question | option 1 | option 2 (up to 5 options)"})
