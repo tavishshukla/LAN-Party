@@ -17,7 +17,10 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/history` — show the last 10 messages/actions in your current room
 - `/game` — start a room-wide number guessing game
 - `/guess <number>` — guess from 1 to 100; first correct guess wins
-- `/scores` — show the current room's saved wins leaderboard
+- `/scores` — show the current room's saved number-game wins leaderboard
+- `/ttt <username>` — challenge someone in your room to tic-tac-toe
+- `/ttt` — show the current board and whose turn it is
+- `/move <1-9>` — place your X or O in a numbered square
 - `/join <room>` — switch rooms; names can use letters, numbers, `_` and `-`
 - `/msg <username> <message>` — send a private message to someone online
 - `/me <action>` — show an action in your current room, e.g. `/me is ready to play`
@@ -27,7 +30,11 @@ Everyone starts in `#lobby`. Messages and actions only appear to people in the s
 
 ## Number guessing game
 
-Start a game with `/game`. Everyone in the current room can guess using `/guess 42` (replace `42` with your guess). The server tells you if your guess is too high or too low, and announces the first winner. Each room can run its own game. Wins are saved in SQLite and `/scores` shows that room's leaderboard.
+Start a game with `/game`. Everyone in the current room can guess using `/guess 42` (replace `42` with your guess). The server tells you if your guess is too high or too low, and announces the first winner. Each room can run its own game. Number-game wins are saved in SQLite and `/scores` shows that room's leaderboard.
+
+## Tic-tac-toe
+
+Challenge another person in the same room with `/ttt username`. X goes first. Use `/move 5` to claim the centre square, for example; `/ttt` shows the board and current turn. Only the two players can move, and the server checks turns, occupied squares, wins, and draws.
 
 ## Tests
 
