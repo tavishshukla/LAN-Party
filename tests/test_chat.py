@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import server
-from server import clean_room_name, clean_username, compare_guess
+from server import clean_room_name, clean_username, compare_guess, load_scores, record_win
 
 
 class ChatInputTests(unittest.TestCase):
@@ -64,6 +64,18 @@ class GuessingGameTests(unittest.TestCase):
 
     def test_correct_guess(self):
         self.assertEqual(compare_guess(50, 50), "correct")
+
+
+class ScoreboardTests(unittest.TestCase):
+    def test_wins_are_saved_and_sorted(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database = os.path.join(temp_dir, "history.sqlite3")
+            with patch.object(server, "HISTORY_DB", database):
+                record_win("lobby", "Riyaan")
+                record_win("lobby", "Tavish")
+                record_win("lobby", "Riyaan")
+                self.assertEqual(load_scores("lobby"), [("Riyaan", 2), ("Tavish", 1)])
+                self.assertEqual(load_scores("other-room"), [])
 
 
 if __name__ == "__main__":
