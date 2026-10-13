@@ -169,6 +169,10 @@ def remove_client(sock):
     with lock:
         name = clients.pop(sock, None)
         room = rooms.pop(sock, DEFAULT_ROOM)
+        if name:
+            for game_room, game in list(ttt_games.items()):
+                if name.lower() in (player.lower() for player in game["players"].values()):
+                    ttt_games.pop(game_room, None)
     try:
         sock.close()
     except OSError:
