@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import server
-from server import clean_room_name, clean_username, compare_guess, load_scores, record_win, ttt_draw, ttt_winner
+from server import clean_room_name, clean_username, compare_guess, load_scores, record_win, poll_summary, ttt_draw, ttt_winner
 
 
 class ChatInputTests(unittest.TestCase):
@@ -92,6 +92,21 @@ class TicTacToeTests(unittest.TestCase):
         board = ttt_draw([None] * 9)
         self.assertIn("1 | 2 | 3", board)
         self.assertIn("7 | 8 | 9", board)
+
+
+class PollTests(unittest.TestCase):
+    def test_poll_summary_counts_votes(self):
+        poll = {
+            "question": "Which game next?",
+            "options": ["Chess", "Mafia", "Trivia"],
+            "votes": {"alex": 1, "sam": 1, "lee": 0},
+            "creator": "alex",
+        }
+        summary = poll_summary(poll)
+        self.assertIn("Which game next?", summary)
+        self.assertIn("1. Chess — 1 vote(s)", summary)
+        self.assertIn("2. Mafia — 2 vote(s)", summary)
+        self.assertIn("Total votes: 3", summary)
 
 
 if __name__ == "__main__":
