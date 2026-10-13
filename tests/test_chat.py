@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import server
-from server import clean_room_name, clean_username, compare_guess, load_scores, record_win
+from server import clean_room_name, clean_username, compare_guess, load_scores, record_win, ttt_draw, ttt_winner
 
 
 class ChatInputTests(unittest.TestCase):
@@ -76,6 +76,22 @@ class ScoreboardTests(unittest.TestCase):
                 record_win("lobby", "Riyaan")
                 self.assertEqual(load_scores("lobby"), [("Riyaan", 2), ("Tavish", 1)])
                 self.assertEqual(load_scores("other-room"), [])
+
+
+class TicTacToeTests(unittest.TestCase):
+    def test_row_wins(self):
+        self.assertEqual(ttt_winner(["X", "X", "X", "O", None, "O", None, None, None]), "X")
+
+    def test_diagonal_wins(self):
+        self.assertEqual(ttt_winner(["O", "X", "X", None, "O", None, "X", None, "O"]), "O")
+
+    def test_incomplete_board_has_no_winner(self):
+        self.assertIsNone(ttt_winner(["X", "O", None, None, "X", None, "O", None, None]))
+
+    def test_board_shows_square_numbers_for_empty_cells(self):
+        board = ttt_draw([None] * 9)
+        self.assertIn("1 | 2 | 3", board)
+        self.assertIn("7 | 8 | 9", board)
 
 
 if __name__ == "__main__":
