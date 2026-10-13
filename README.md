@@ -15,6 +15,10 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/users` — list who's online in your current room
 - `/rooms` — list rooms and how many people are in each
 - `/history` — show the last 10 messages/actions in your current room
+- `/poll question | option 1 | option 2` — start a room poll with 2–5 options
+- `/poll` — view the active poll and results
+- `/vote <number>` — vote or change your vote
+- `/endpoll` — close your poll and show final results
 - `/game` — start a room-wide number guessing game
 - `/guess <number>` — guess from 1 to 100; first correct guess wins
 - `/scores` — show the current room's saved number-game wins leaderboard
@@ -27,6 +31,10 @@ A terminal chat app for computers on the same trusted local network. Built with 
 - `/quit` — disconnect
 
 Everyone starts in `#lobby`. Messages and actions only appear to people in the same room. Private messages can reach any online user regardless of room. Each room keeps its latest 10 messages/actions in a local SQLite database (`chat_history.sqlite3`), so history survives server restarts.
+
+## Room polls
+
+Start a poll with `/poll Which game next? | Chess | Mafia | Trivia`. People in the room can vote with `/vote 2`; voting again changes their vote. Use `/poll` to check results. The person who started the poll can close it with `/endpoll`. Only one poll can run in a room at a time.
 
 ## Number guessing game
 
