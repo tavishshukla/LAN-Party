@@ -11,6 +11,7 @@ clients = {}
 rooms = {}
 games = {}
 ttt_games = {}
+polls = {}
 HISTORY_LIMIT = 10
 HISTORY_DB = "chat_history.sqlite3"
 lock = threading.Lock()
@@ -57,6 +58,16 @@ def ttt_draw(board):
         "---+---+---\n"
         f" {cells[6]} | {cells[7]} | {cells[8]} "
     )
+
+
+def poll_summary(poll):
+    counts = [0] * len(poll["options"])
+    for choice in poll["votes"].values():
+        counts[choice] += 1
+    lines = [f"Poll: {poll['question']}"]
+    lines.extend(f"{i + 1}. {option} — {counts[i]} vote(s)" for i, option in enumerate(poll["options"]))
+    lines.append(f"Total votes: {len(poll['votes'])}")
+    return "\n".join(lines)
 
 
 def send(sock, packet):
@@ -233,11 +244,73 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /scores /ttt <username> /ttt /move <1-9> /join <room> /msg <username> <message> /me <action> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /poll question | option 1 | option 2 /vote <number> /endpoll /game /guess <1-100> /scores /ttt <username> /ttt /move <1-9> /join <room> /msg <username> <message> /me <action> /quit"})
             elif msg == "/history":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 history = load_history(current_room)
                 send(sock, {"type": "history", "room": current_room, "items": history})
+            elif msg == "/poll" or msg.startswith("/poll "):
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                parts = msg[6:].split("|")
+                if len(parts) < 3 or len(parts) > 6:
+                    send(sock, {"type": "error", "text": "usage: /poll question | option 1 | option 2 (up to 5 options)"})
+                    continue
+                question = parts[0].strip()[:180]
+                options = [part.strip()[:80] for part in parts[1:]]
+                if not question or any(not option for option in options) or len(set(option.lower() for option in options)) != len(options):
+                    send(sock, {"type": "error", "text": "add a question and 2–5 different, non-empty options"})
+                    continue
+                with lock:
+                    if current_room in polls:
+                        poll_started = False
+                    else:
+                        polls[current_room] = {"question": question, "options": options, "votes": {}, "creator": name}
+                        poll_started = True
+                if not poll_started:
+                    send(sock, {"type": "error", "text": "there's already a poll in this room; use /poll to view it"})
+                else:
+                    poll = polls[current_room]
+                    broadcast({"type": "system", "time": stamp(), "text": poll_summary(poll) + "\nVote with /vote <number>. Only one active poll per room."}, room=current_room)
+            elif msg == "/vote" or msg.startswith("/vote "):
+                parts = msg.split(maxsplit=1)
+                if len(parts) != 2 or not parts[1].isdigit():
+                    send(sock, {"type": "error", "text": "usage: /vote <option number>"})
+                    continue
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    poll = polls.get(current_room)
+                    if poll is None:
+                        vote_result = "missing"
+                    elif not 1 <= int(parts[1]) <= len(poll["options"]):
+                        vote_result = "invalid"
+                    else:
+                        poll["votes"][name.lower()] = int(parts[1]) - 1
+                        vote_result = "voted"
+                        summary = poll_summary(poll)
+                if vote_result == "missing":
+                    send(sock, {"type": "error", "text": "there's no active poll in this room"})
+                elif vote_result == "invalid":
+                    send(sock, {"type": "error", "text": "that option number doesn't exist"})
+                else:
+                    broadcast({"type": "system", "time": stamp(), "text": f"{name} voted.\n{summary}"}, room=current_room)
+            elif msg == "/endpoll":
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    poll = polls.get(current_room)
+                    if poll is None:
+                        poll_result = "missing"
+                    elif poll["creator"].lower() != name.lower():
+                        poll_result = "not_creator"
+                    else:
+                        summary = poll_summary(poll)
+                        polls.pop(current_room, None)
+                        poll_result = "ended"
+                if poll_result == "missing":
+                    send(sock, {"type": "error", "text": "there's no active poll in this room"})
+                elif poll_result == "not_creator":
+                    send(sock, {"type": "error", "text": "only the person who started the poll can end it"})
+                else:
+                    broadcast({"type": "system", "time": stamp(), "text": "Poll closed.\n" + summary}, room=current_room)
             elif msg == "/ttt" or msg.startswith("/ttt "):
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 parts = msg.split(maxsplit=1)
