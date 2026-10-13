@@ -10,6 +10,7 @@ DEFAULT_ROOM = "lobby"
 clients = {}
 rooms = {}
 games = {}
+ttt_games = {}
 HISTORY_LIMIT = 10
 HISTORY_DB = "chat_history.sqlite3"
 lock = threading.Lock()
@@ -33,6 +34,29 @@ def compare_guess(secret, guess):
     if guess > secret:
         return "high"
     return "correct"
+
+
+def ttt_winner(board):
+    lines = (
+        (0, 1, 2), (3, 4, 5), (6, 7, 8),
+        (0, 3, 6), (1, 4, 7), (2, 5, 8),
+        (0, 4, 8), (2, 4, 6),
+    )
+    for a, b, c in lines:
+        if board[a] and board[a] == board[b] == board[c]:
+            return board[a]
+    return None
+
+
+def ttt_draw(board):
+    cells = [board[i] or str(i + 1) for i in range(9)]
+    return (
+        f" {cells[0]} | {cells[1]} | {cells[2]} \n"
+        "---+---+---\n"
+        f" {cells[3]} | {cells[4]} | {cells[5]} \n"
+        "---+---+---\n"
+        f" {cells[6]} | {cells[7]} | {cells[8]} "
+    )
 
 
 def send(sock, packet):
@@ -205,11 +229,89 @@ def handle(sock, address):
             if msg == "/quit":
                 break
             if msg == "/help":
-                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /scores /join <room> /msg <username> <message> /me <action> /quit"})
+                send(sock, {"type": "system", "time": stamp(), "text": "commands: /help /users /rooms /history /game /guess <1-100> /scores /ttt <username> /ttt /move <1-9> /join <room> /msg <username> <message> /me <action> /quit"})
             elif msg == "/history":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 history = load_history(current_room)
                 send(sock, {"type": "history", "room": current_room, "items": history})
+            elif msg == "/ttt" or msg.startswith("/ttt "):
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                parts = msg.split(maxsplit=1)
+                with lock:
+                    active_game = ttt_games.get(current_room)
+                if len(parts) == 1:
+                    if active_game is None:
+                        send(sock, {"type": "error", "text": "no tic-tac-toe game in this room; challenge someone with /ttt <username>"})
+                    else:
+                        mark = "X" if active_game["players"]["X"].lower() == name.lower() else "O" if active_game["players"]["O"].lower() == name.lower() else None
+                        next_player = active_game["players"][active_game["turn"]]
+                        send(sock, {"type": "system", "time": stamp(), "text": f"Tic-tac-toe in #{current_room}\n{ttt_draw(active_game['board'])}\nX: {active_game['players']['X']} | O: {active_game['players']['O']}\nTurn: {next_player}"})
+                else:
+                    target_sock, target_name = find_client(parts[1])
+                    if target_sock is None:
+                        send(sock, {"type": "error", "text": f"{parts[1]} isn't online"})
+                    elif target_sock is sock:
+                        send(sock, {"type": "error", "text": "you can't challenge yourself"})
+                    elif rooms.get(target_sock, DEFAULT_ROOM) != current_room:
+                        send(sock, {"type": "error", "text": "you can only challenge someone in your current room"})
+                    elif active_game is not None:
+                        send(sock, {"type": "error", "text": "there's already a tic-tac-toe game in this room"})
+                    else:
+                        with lock:
+                            ttt_games[current_room] = {
+                                "board": [None] * 9,
+                                "players": {"X": name, "O": target_name},
+                                "turn": "X",
+                            }
+                        broadcast({"type": "system", "time": stamp(), "text": f"Tic-tac-toe: {name} (X) vs {target_name} (O)!\n{ttt_draw([None] * 9)}\n{ name } starts. Use /move <1-9>."}, room=current_room)
+            elif msg == "/move" or msg.startswith("/move "):
+                parts = msg.split(maxsplit=1)
+                if len(parts) != 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= 9:
+                    send(sock, {"type": "error", "text": "usage: /move <number from 1 to 9>"})
+                    continue
+                position = int(parts[1]) - 1
+                current_room = rooms.get(sock, DEFAULT_ROOM)
+                with lock:
+                    active_game = ttt_games.get(current_room)
+                    if active_game is None:
+                        move_result = "missing"
+                    else:
+                        mark = next((mark for mark, player in active_game["players"].items() if player.lower() == name.lower()), None)
+                        if mark is None:
+                            move_result = "spectator"
+                        elif mark != active_game["turn"]:
+                            move_result = "turn"
+                        elif active_game["board"][position] is not None:
+                            move_result = "occupied"
+                        else:
+                            active_game["board"][position] = mark
+                            winner = ttt_winner(active_game["board"])
+                            draw = winner is None and all(active_game["board"])
+                            if winner or draw:
+                                finished_game = ttt_games.pop(current_room)
+                                move_result = "won" if winner else "draw"
+                            else:
+                                active_game["turn"] = "O" if mark == "X" else "X"
+                                finished_game = None
+                                move_result = "moved"
+                            board_text = ttt_draw(active_game["board"])
+                            players_text = f"X: {active_game['players']['X']} | O: {active_game['players']['O']}"
+                            next_name = active_game["players"][active_game["turn"]] if move_result == "moved" else None
+                if move_result == "missing":
+                    send(sock, {"type": "error", "text": "no tic-tac-toe game in this room"})
+                elif move_result == "spectator":
+                    send(sock, {"type": "error", "text": "only the two players can make moves"})
+                elif move_result == "turn":
+                    send(sock, {"type": "error", "text": "it's not your turn"})
+                elif move_result == "occupied":
+                    send(sock, {"type": "error", "text": "that square is taken"})
+                elif move_result == "won":
+                    record_win(current_room, name)
+                    broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\n{name} wins tic-tac-toe! Use /scores for the number-game leaderboard."}, room=current_room)
+                elif move_result == "draw":
+                    broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\nIt's a draw."}, room=current_room)
+                else:
+                    broadcast({"type": "system", "time": stamp(), "text": f"{board_text}\n{players_text}\nNext turn: {next_name}"}, room=current_room)
             elif msg == "/game":
                 current_room = rooms.get(sock, DEFAULT_ROOM)
                 with lock:
